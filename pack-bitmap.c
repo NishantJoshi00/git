@@ -926,6 +926,29 @@ static void filter_bitmap_object_type(struct bitmap_index *bitmap_git,
 		filter_bitmap_exclude_type(bitmap_git, tip_objects, to_filter, OBJ_BLOB);
 }
 
+static int filter_supported(struct list_objects_filter_options *filter)
+{
+	int i;
+
+	switch (filter->choice) {
+	case LOFC_BLOB_NONE:
+	case LOFC_BLOB_LIMIT:
+	case LOFC_OBJECT_TYPE:
+		return 1;
+	case LOFC_TREE_DEPTH:
+		if (filter->tree_exclude_depth == 0)
+			return 1;
+		return 0;
+	case LOFC_COMBINE:
+		for (i = 0; i < filter->sub_nr; i++)
+			if (!filter_supported(&filter->sub[i]))
+				return 0;
+		return 1;
+	default:
+		return 0;
+	}
+}
+
 static int filter_bitmap(struct bitmap_index *bitmap_git,
 			 struct object_list *tip_objects,
 			 struct bitmap *to_filter,
@@ -933,6 +956,8 @@ static int filter_bitmap(struct bitmap_index *bitmap_git,
 {
 	if (!filter || filter->choice == LOFC_DISABLED)
 		return 0;
+	if (!filter_supported(filter))
+		return -1;
 
 	if (filter->choice == LOFC_BLOB_NONE) {
 		if (bitmap_git)
@@ -949,8 +974,7 @@ static int filter_bitmap(struct bitmap_index *bitmap_git,
 		return 0;
 	}
 
-	if (filter->choice == LOFC_TREE_DEPTH &&
-	    filter->tree_exclude_depth == 0) {
+	if (filter->choice == LOFC_TREE_DEPTH) {
 		if (bitmap_git)
 			filter_bitmap_tree_depth(bitmap_git, tip_objects,
 						 to_filter,
@@ -966,8 +990,17 @@ static int filter_bitmap(struct bitmap_index *bitmap_git,
 		return 0;
 	}
 
-	/* filter choice not handled */
-	return -1;
+	if (filter->choice == LOFC_COMBINE) {
+		int i;
+		for (i = 0; i < filter->sub_nr; i++) {
+			if (filter_bitmap(bitmap_git, tip_objects, to_filter,
+					  &filter->sub[i]) < 0)
+				return -1;
+		}
+		return 0;
+	}
+
+	BUG("unsupported filter choice");
 }
 
 static int can_filter_bitmap(struct list_objects_filter_options *filter)
