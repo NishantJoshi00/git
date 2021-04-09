@@ -207,6 +207,34 @@ test_expect_success 'verify object:type=tag prints tag' '
 	test_cmp expected actual
 '
 
+test_expect_success 'verify object:type=blob prints only blob with --filter-provided-revisions' '
+	printf "%s blob\n" $(git -C object-type rev-parse HEAD:blob) >expected &&
+	git -C object-type rev-list --objects \
+		--filter=object:type=blob --filter-provided-revisions HEAD >actual &&
+	test_cmp expected actual
+'
+
+test_expect_success 'verify object:type=tree prints only tree with --filter-provided-revisions' '
+	printf "%s \n" $(git -C object-type rev-parse HEAD^{tree}) >expected &&
+	git -C object-type rev-list --objects \
+		--filter=object:type=tree HEAD --filter-provided-revisions >actual &&
+	test_cmp expected actual
+'
+
+test_expect_success 'verify object:type=commit prints only commit with --filter-provided-revisions' '
+	git -C object-type rev-parse HEAD >expected &&
+	git -C object-type rev-list --objects \
+		--filter=object:type=commit --filter-provided-revisions HEAD >actual &&
+	test_cmp expected actual
+'
+
+test_expect_success 'verify object:type=tag prints only tag with --filter-provided-revisions' '
+	printf "%s tag\n" $(git -C object-type rev-parse tag) >expected &&
+	git -C object-type rev-list --objects \
+		--filter=object:type=tag --filter-provided-revisions tag >actual &&
+	test_cmp expected actual
+'
+
 # Test sparse:path=<path> filter.
 # !!!!
 # NOTE: sparse:path filter support has been dropped for security reasons,
